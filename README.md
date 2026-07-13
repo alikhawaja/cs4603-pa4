@@ -452,6 +452,8 @@ Connect the provided MCP server as a tool node in your graph:
 
 **File:** `agent/synthesizer.py`
 
+**Reference:** No new pattern — this is a standard LLM synthesis call over the collected context, like the answer-generation step in `wk5_langgraph/11b.langgraph_rag.ipynb` (and PA2's RAG chain).
+
 #### IMPLEMENTATION
 
 The synthesizer receives all step results and produces a coherent final answer:
@@ -587,6 +589,8 @@ registered = mlflow.register_model(model_info.model_uri, f"{catalog}.{schema}.{m
 
 **File:** `deployment/deploy.py` (continued)
 
+**Reference:** `databricks_deployment_v1/deployment.ipynb` — the endpoint-creation cells (`WorkspaceClient`, `EndpointCoreConfigInput`, `ServedEntityInput`).
+
 #### IMPLEMENTATION
 
 Extend your deployment script to create or update a Model Serving endpoint:
@@ -635,6 +639,8 @@ databricks serving-endpoints get <your-endpoint-name>
 
 ### Task 2.4: Test the Deployed Endpoint [10 pts]
 
+**Reference:** `databricks_deployment_v1/streamlit_app.py` and `deployment.ipynb` show how the deployed endpoint is invoked and its response parsed.
+
 **Notebook work (pa4.ipynb):**
 
 1. Call the endpoint using `curl` and show the raw response
@@ -668,6 +674,8 @@ response = client.chat.completions.create(
 ### Task 3.1: Client Class [12 pts]
 
 **File:** `client/sdk.py`
+
+**Reference:** `databricks_deployment_v1/streamlit_app.py` for endpoint-invocation + auth; `databricks_deployment_v2/agent_chat.py` for the `agents.deploy()` client style.
 
 #### IMPLEMENTATION
 
