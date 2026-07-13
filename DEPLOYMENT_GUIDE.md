@@ -1,6 +1,6 @@
 # PA4 - Document Analyst Deployment
 
-You already deployed a LangGraph agent in **`wk5_langgraph/15.databricks_deployment/`**.
+You already deployed a LangGraph agent in **`databricks_deployment_v1/`**.
 PA4's deployment is the **same pipeline** — you are not learning a new method. This
 guide starts from what you already did and points out the handful of things that are
 *different* because your PA4 agent is bigger and modular.
@@ -12,13 +12,13 @@ guide starts from what you already did and points out the handful of things that
 > or want to automate the deploy steps below.
 
 > **PA4 deploys the same graph two ways.**
-> - **Part 2 (from wk5/15) — the manual path.** You call `log_model` → `register_model`
+> - **Part 2 (from databricks_deployment_v1) — the manual path.** You call `log_model` → `register_model`
 >   → `WorkspaceClient.serving_endpoints` yourself, wire a secret scope, and poll for
 >   `READY`. **This first task deliberately walks you through the internals of
 >   deployment** — every step the platform normally hides (packaging, the serving
 >   container, credential injection, endpoint config, the READY lifecycle) is something
 >   *you* do by hand, so you understand what actually happens when a model goes live.
-> - **Bonus B (from wk5/16) — the `agents.deploy()` path.** Once you've seen the
+> - **Bonus B (from databricks_deployment_v2) — the `agents.deploy()` path.** Once you've seen the
 >   internals, the `databricks-agents` SDK collapses all of that into **one call** that
 >   provisions the endpoint (plus a Review App) and handles auth for you — no secret
 >   scope, no manual endpoint config.
@@ -31,7 +31,7 @@ guide starts from what you already did and points out the handful of things that
 
 ## 1. The mental model you already have
 
-In wk5/15 you ran this exact chain, and PA4 is identical at this level:
+In databricks_deployment_v1 you ran this exact chain, and PA4 is identical at this level:
 
 ```
 your agent file  ──log_model──▶  MLflow (models-from-code)
@@ -48,7 +48,7 @@ Everything you learned still applies:
 - Credentials injected as **secret references** (`{{secrets/cs4603-deploy/...}}`).
 - Test with `openai.OpenAI(base_url=f"{host}/serving-endpoints")`.
 
-If you understood wk5/15, you already understand 80% of PA4 deployment. The rest is
+If you understood databricks_deployment_v1, you already understand 80% of PA4 deployment. The rest is
 the five differences below.
 
 > **Databricks container:**
@@ -65,7 +65,7 @@ the five differences below.
 
 ## 2. PA4 Deployment Add-Ons
 
-| # | wk5/15 | PA4 | Why it changes |
+| # | databricks_deployment_v1 | PA4 | Why it changes |
 |---|--------|-----|----------------|
 | 1 | One self-contained `agent.py` | `agent_model.py` **imports** your `agent/`, `rag/`, `config.py` | Your Part 1 code is modular (8 files); you don't want to copy-paste it all into one file |
 | 2 | `log_model(lc_model=..., name=..., input_example=...)` | same **+ `code_paths=[...]`** | The serving container needs your local packages, so you ship them |
@@ -79,7 +79,7 @@ Each of these is explained with a concrete step below.
 
 ## 3. Difference #1 + #2 — Ship your package with `code_paths`
 
-**This is the single most important change.** In wk5/15 `agent.py` had *everything*
+**This is the single most important change.** In databricks_deployment_v1 `agent.py` had *everything*
 inline, so `log_model` only needed the one file. Your PA4 `agent_model.py` looks like:
 
 ```python
@@ -99,7 +99,7 @@ files. You do that with `code_paths`:
 mlflow.set_registry_uri("databricks-uc")
 with mlflow.start_run():
     model_info = mlflow.langchain.log_model(
-        lc_model="deployment/agent_model.py",     # same idea as wk5/15
+        lc_model="deployment/agent_model.py",     # same idea as databricks_deployment_v1
         name="agent",
         code_paths=[                              # NEW: ship your local packages
             "agent", "rag", "tools", "config.py",
@@ -115,14 +115,14 @@ with mlflow.start_run():
 
 > **If you skip `code_paths`,** the endpoint will fail at startup with
 > `ModuleNotFoundError: No module named 'agent'` in the Serving **Logs** tab. That is
-> the #1 PA4 deployment error — and it never happened in wk5/15 because that agent was
+> the #1 PA4 deployment error — and it never happened in databricks_deployment_v1 because that agent was
 > a single file.
 
 ---
 
 ## 4. Difference #4 — The MCP server travels with your model
 
-In wk5/15 the tools were plain functions defined right in `agent.py`. In PA4 they live
+In databricks_deployment_v1 the tools were plain functions defined right in `agent.py`. In PA4 they live
 in `tools/mcp_server.py` and your graph launches it. For deployment:
 
 - Include `"tools"` in `code_paths` (done above) so the file is in the container.
@@ -149,7 +149,7 @@ tools = load_mcp_tools(_mcp_server)
 
 ## 5. Difference #5 — Make the endpoint OpenAI-compatible
 
-wk5/15 used `MessagesState`, so the assistant node automatically put its reply on the
+databricks_deployment_v1 used `MessagesState`, so the assistant node automatically put its reply on the
 `messages` channel — and the endpoint returned it as a normal chat completion. Your
 PA4 `AnalystState` has extra fields (`plan`, `step_results`, `final_answer`). If your
 **synthesizer** only sets `final_answer`, the endpoint returns an *empty* completion.
@@ -173,9 +173,9 @@ container — no code change.
 
 ---
 
-## 7. Everything else is wk5/15, unchanged
+## 7. Everything else is databricks_deployment_v1, unchanged
 
-**Secrets** — identical to wk5/15. Create the scope once, then reference it:
+**Secrets** — identical to databricks_deployment_v1. Create the scope once, then reference it:
 
 ```bash
 databricks secrets create-scope cs4603-deploy
@@ -195,7 +195,7 @@ environment_vars={
 }
 ```
 
-**Testing** — same OpenAI SDK call. One correction: the wk5/15 notebook's last cell
+**Testing** — same OpenAI SDK call. One correction: the databricks_deployment_v1 notebook's last cell
 had a bug (`response[0].messages[-1]`). Use the standard OpenAI shape:
 
 ```python
@@ -206,7 +206,7 @@ resp = client.chat.completions.create(
 print(resp.choices[0].message.content)   # not response[0].messages[-1]
 ```
 
-**Where you run it** — wk5/15 ran the deploy cells in a Databricks notebook. In PA4 you
+**Where you run it** — databricks_deployment_v1 ran the deploy cells in a Databricks notebook. In PA4 you
 may either run the same cells in `pa4.ipynb`, or run `deployment/deploy.py`. Both do the
 identical three MLflow/SDK calls.
 
@@ -227,7 +227,7 @@ Before you click deploy, verify — in this order:
 
 ## 9. If the endpoint goes `DEPLOYMENT_FAILED`
 
-Open **Serving → your endpoint → Logs** (same as wk5/15) and match the traceback:
+Open **Serving → your endpoint → Logs** (same as databricks_deployment_v1) and match the traceback:
 
 | Log message | Cause | Fix |
 |-------------|-------|-----|
@@ -237,5 +237,5 @@ Open **Serving → your endpoint → Logs** (same as wk5/15) and match the trace
 | endpoint READY but empty answers | synthesizer didn't append `AIMessage` | see §5 |
 | retrieval errors at inference | VS index/endpoint env vars missing | add `VECTOR_SEARCH_*` to `environment_vars` |
 
-You've done this loop before in wk5/15 — read the traceback, fix the one line, re-log,
+You've done this loop before in databricks_deployment_v1 — read the traceback, fix the one line, re-log,
 re-deploy.

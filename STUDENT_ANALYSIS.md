@@ -1,13 +1,12 @@
-# CS4603 PA4 — Document Analyst
+# CS4603 PA4 — Document Analyst (Student Submission)
 
-> This `README.md` is a **graded deliverable**:
+> This is your **submission file**. `README.md` is the assignment spec — this document is where you write up your work.
 >
 > - Document how to set up, run, and deploy your Document Analyst so a TA can reproduce your results.
 > - **Answer every ANALYSIS QUESTION** from the assignment in the sections below.
-> - Code that runs but is not explained will not receive full marks.
 > - Replace every `TODO` before submitting.
 > - Keep it self-contained: a reader should be able to follow this file top-to-bottom —
->   setup → ingest → run → deploy → results — without opening the assignment PDF.
+>   setup → ingest → run → deploy → results — without opening the assignment spec.
 
 ## Setup
 

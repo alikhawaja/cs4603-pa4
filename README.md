@@ -9,6 +9,8 @@
 
 This assignment takes you from a locally-running LangGraph agent to a **production-deployed service** on Databricks. You will build a multi-agent Document Analyst system, deploy it as a Model Serving endpoint, and write a client SDK to invoke it programmatically.
 
+> **Where you write up your work:** this `README.md` is the assignment spec. Record your setup steps, results, and answers to the analysis questions in **[`STUDENT_ANALYSIS.md`](STUDENT_ANALYSIS.md)** — that is the file you submit.
+
 The core engineering decisions you will explore:
 
 1. **Graph architecture:** How to decompose a complex task into cooperating agents with typed state, conditional routing, and tool integration.
@@ -152,16 +154,16 @@ graph TD
 
 You should already be comfortable with:
 
-- LangGraph: state schemas, nodes, conditional edges, tool nodes, subgraphs (wk5 notebooks 1–14)
+- LangGraph: state schemas, nodes, conditional edges, tool nodes, subgraphs (wk5 notebooks 1-11)
 - RAG on Databricks: `ai_prep_search` chunking, managed embeddings, **Vector Search** retrieval (PA2 Part 1)
 - MLflow: experiment logging, model registration (PA1–PA3)
-- Databricks Model Serving and Unity Catalog (wk5 notebook 15)
+- Databricks Model Serving and Unity Catalog (databricks_deployment_v1)
 
 > **Everything runs on Databricks.** PA4 uses **Databricks Vector Search** end-to-end — the same managed index works locally *and* inside the deployed serving container, so there is no local-vs-cloud retrieval gap to bridge.
 
 Course repository: https://github.com/alikhawaja/cs4603
 
-Use `wk5_langgraph/15.databricks_deployment/` as the primary reference for deployment patterns.
+Use `databricks_deployment_v1/` as the primary reference for deployment patterns.
 
 ---
 
@@ -188,7 +190,10 @@ PA-4/
 ├── .env.example                    # [GIVEN]
 ├── pyproject.toml                  # [GIVEN]
 ├── config.py                       # [GIVEN] — env loading + LLM client factory
-├── README.md                       # [STUDENT]
+├── README.md                       # [GIVEN] — the assignment spec (this file)
+├── DEPLOYMENT_GUIDE.md             # [GIVEN] — step-by-step deployment walkthrough
+├── GITHUB_PIPELINE.md              # [GIVEN] — CI/CD background for Bonus A
+├── STUDENT_ANALYSIS.md            # [STUDENT] — your submission write-up
 ├── pa4.ipynb                       # [STUDENT] — development & testing notebook
 │
 ├── data/
@@ -207,13 +212,16 @@ PA-4/
 │   └── prompts.py                  # [STUDENT] — all system prompts
 │
 ├── rag/
+│   ├── __init__.py                 # [STUDENT]
 │   ├── ingest.py                   # [STUDENT] — parse + chunk into a Delta table
 │   └── store.py                    # [STUDENT] — Vector Search index + retriever
 │
 ├── tools/
+│   ├── __init__.py                # [GIVEN]
 │   └── mcp_server.py              # [GIVEN] — MCP server with math/finance tools
 │
 ├── deployment/
+│   ├── __init__.py                # [STUDENT]
 │   ├── agent_model.py             # [STUDENT] — MLflow models-from-code definition
 │   ├── deploy.py                  # [STUDENT] — deployment script
 │   ├── deploy_agents.py           # [STUDENT] — (Bonus B) databricks-agents deployment
@@ -289,7 +297,7 @@ You are provided a financial document — `data/annual_report.pdf`, the FY2023 a
 3. Create a **STANDARD** Vector Search endpoint and a **Delta Sync index** with managed embeddings (`pipeline_type="TRIGGERED"`, `primary_key="chunk_id"`, `embedding_source_column="chunk_to_retrieve"`, `embedding_model_endpoint_name=$EMBEDDINGS_ENDPOINT`).
 4. Verify the index reaches `READY` and answers a similarity-search test query.
 
-**Reference:** PA2 Part 1 (Vector Search walkthrough) and `wk5_langgraph/8.langgraph_rag/` for the LangGraph + retriever wiring pattern (adapt its pgvector retriever to `DatabricksVectorSearch`).
+**Reference:** PA2 Part 1 (Vector Search walkthrough) and `wk5_langgraph/11b.langgraph_rag.ipynb` for the LangGraph + retriever wiring pattern (adapt its pgvector retriever to `DatabricksVectorSearch`).
 
 > This is the only vector store in PA4. Because the index lives in Databricks, the exact same retriever code runs locally and inside your deployed endpoint (Part 2) — no separate embedding path for deployment.
 
@@ -343,7 +351,7 @@ Define a `TypedDict` state that tracks:
 
 **File:** `agent/planner.py`
 
-**Reference:** `wk5_langgraph/11.plan_and_execute.ipynb`
+**Reference:** `wk6_agent_design/2.plan_and_execute.ipynb`
 
 #### IMPLEMENTATION
 
@@ -365,7 +373,7 @@ The planner receives the user query and produces a list of 2–5 atomic steps.
 
 **File:** `agent/supervisor.py`
 
-**Reference:** `wk5_langgraph/10.multi_agent.ipynb`
+**Reference:** `wk6_agent_design/1.multi_agent.ipynb`
 
 #### IMPLEMENTATION
 
@@ -389,7 +397,7 @@ Implement the conditional edge function that maps the supervisor's `next_agent` 
 
 **File:** `agent/rag_agent.py`
 
-**Reference:** PA2 Part 1 (Vector Search + `DatabricksVectorSearch`) and `wk5_langgraph/8.langgraph_rag/`
+**Reference:** PA2 Part 1 (Vector Search + `DatabricksVectorSearch`) and `wk5_langgraph/11b.langgraph_rag.ipynb`
 
 #### IMPLEMENTATION
 
@@ -414,7 +422,7 @@ Reuse your `rag/store.py` retriever factory so the identical code path serves bo
 
 **File:** `agent/graph.py` (MCP integration)
 
-**Reference:** `wk4_langchain_agents_mcp/` for MCP client patterns
+**Reference:** `wk4_agents_mcp/` for MCP client patterns
 
 #### IMPLEMENTATION
 
@@ -461,7 +469,7 @@ The synthesizer receives all step results and produces a coherent final answer:
 
 **File:** `agent/graph.py`
 
-**Reference:** `wk5_langgraph/12.subgraphs.ipynb` for composition patterns
+**Reference:** `wk5_langgraph/9.subgraphs.ipynb` for composition patterns
 
 
 #### IMPLEMENTATION
@@ -500,7 +508,7 @@ graph = builder.compile()
 
 **Goal:** Package your Document Analyst as an MLflow model and deploy it to a Databricks Model Serving endpoint.
 
-**Reference:** `wk5_langgraph/15.databricks_deployment/` — study `agent.py`, `deploy_setup.py`, and `deployment.ipynb` thoroughly before starting.
+**Reference:** `databricks_deployment_v1/` — study `agent.py` and `deployment.ipynb` thoroughly before starting.
 
 > **See [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md) for complete details** on the manual
 > deployment path — the mental model, the five PA4-specific differences, the serving
@@ -512,7 +520,7 @@ graph = builder.compile()
 
 **File:** `deployment/agent_model.py`
 
-**Reference:** `wk5_langgraph/15.databricks_deployment/agent.py`
+**Reference:** `databricks_deployment_v1/agent.py`
 
 #### IMPLEMENTATION
 
@@ -537,7 +545,7 @@ Create a self-contained model file that MLflow can serialize via models-from-cod
 
 **File:** `deployment/deploy.py`
 
-**Reference:** `wk5_langgraph/15.databricks_deployment/deploy_setup.py`
+**Reference:** `databricks_deployment_v1/deployment.ipynb`
 
 #### IMPLEMENTATION
 
@@ -759,7 +767,7 @@ Create a GitHub Actions workflow that:
 
 **File:** `deployment/deploy_agents.py`
 
-**Reference:** `wk5_langgraph/16.databricks_deployment_v2/` — study `agent_chat.py` and `deployment_v2.ipynb`, which deploy the same agent via `agents.deploy()` with automatic authentication (no secret scope). This is the v2 counterpart to the `15.databricks_deployment/` reference used in Part 2.
+**Reference:** `databricks_deployment_v2/` — study `agent_chat.py` and `deployment_v2.ipynb`, which deploy the same agent via `agents.deploy()` with automatic authentication (no secret scope). This is the v2 counterpart to the `databricks_deployment_v1/` reference used in Part 2.
 
 > **See [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md) for complete details.** The
 > `agents.deploy()` path reuses the entire manual pipeline unchanged — you only swap the
@@ -825,7 +833,7 @@ service from the model that calls it.
 
 **Files:** `deployment/mcp_app/app.py`, `deployment/mcp_app/app.yaml`
 
-**Reference:** `wk4_langchain_agents_mcp/` for MCP transports, and the Databricks Apps
+**Reference:** `wk4_agents_mcp/` for MCP transports, and the Databricks Apps
 documentation for hosting a custom web service.
 
 ---
@@ -928,7 +936,7 @@ Bonus C:   agent  ──HTTPS + bearer────▶  MCP server        (separa
 | Bonus C: Standalone MCP server on Databricks | 15 |
 | **Total** | **100 + 45 bonus** |
 
-**Note:** Written analysis responses account for approximately 25% of total points. Code that runs but is not understood will not receive full marks.
+**Note:** Written analysis responses account for approximately 10% of total points.
 
 ---
 
@@ -938,7 +946,7 @@ Submit a single zip file containing:
 
 - All source code in the prescribed directory structure
 - Your completed `pa4.ipynb` with ALL OUTPUTS VISIBLE
-- Your `README.md` with all analysis questions answered
+- Your completed `STUDENT_ANALYSIS.md` write-up with all analysis questions answered
 - Do not include `.env`, virtual environment directories, or large binary/model files
 
 Name your submission: `<roll_number>_pa4.zip`
@@ -950,18 +958,18 @@ Name your submission: `<roll_number>_pa4.zip`
 | Topic | Course Material |
 |-------|----------------|
 | State schemas & reducers | `wk5_langgraph/3a.annotations.ipynb`, `3b.reducers.ipynb` |
-| Tool calling in LangGraph | `wk5_langgraph/4.tool_calling.ipynb` |
+| Tool calling in LangGraph | `wk5_langgraph/4b.agent_with_tools.ipynb` |
 | Router / conditional edges | `wk5_langgraph/5.router.ipynb` |
-| ReAct agent | `wk5_langgraph/6.agent.ipynb` |
+| ReAct agent | `wk5_langgraph/4a.agent.ipynb` |
 | Agent memory & persistence | `wk5_langgraph/7.agent-memory.ipynb` |
-| LangGraph + RAG | `wk5_langgraph/8.langgraph_rag/` (adapt retriever to Vector Search) |
-| Human-in-the-loop | `wk5_langgraph/9.human_in_the_loop.ipynb` |
-| Multi-agent patterns | `wk5_langgraph/10.multi_agent.ipynb` |
-| Plan-and-execute | `wk5_langgraph/11.plan_and_execute.ipynb` |
-| Subgraphs | `wk5_langgraph/12.subgraphs.ipynb` |
-| Streaming | `wk5_langgraph/13.streaming.ipynb` |
-| Deployment pipeline | `wk5_langgraph/15.databricks_deployment/` |
-| Agent Framework deployment (`agents.deploy()`) | `wk5_langgraph/16.databricks_deployment_v2/` |
-| MCP tool integration | `wk4_langchain_agents_mcp/` |
-| Standalone MCP server on Databricks (Bonus C) | `wk4_langchain_agents_mcp/` (MCP transports) + Databricks Apps docs |
+| LangGraph + RAG | `wk5_langgraph/11b.langgraph_rag.ipynb` (adapt retriever to Vector Search) |
+| Human-in-the-loop | `wk5_langgraph/8.human_in_the_loop.ipynb` |
+| Multi-agent patterns | `wk6_agent_design/1.multi_agent.ipynb` |
+| Plan-and-execute | `wk6_agent_design/2.plan_and_execute.ipynb` |
+| Subgraphs | `wk5_langgraph/9.subgraphs.ipynb` |
+| Streaming | `wk5_langgraph/10.streaming.ipynb` |
+| Deployment pipeline | `databricks_deployment_v1/` |
+| Agent Framework deployment (`agents.deploy()`) | `databricks_deployment_v2/` |
+| MCP tool integration | `wk4_agents_mcp/` |
+| Standalone MCP server on Databricks (Bonus C) | `wk4_agents_mcp/` (MCP transports) + Databricks Apps docs |
 | RAG ingestion & Vector Search retrieval | PA2 Part 1 (Databricks Vector Search) |
