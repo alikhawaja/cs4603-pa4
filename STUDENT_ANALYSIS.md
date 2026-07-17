@@ -111,6 +111,7 @@ If the rag_agent in step 1 returns "not found in documents", the original plan's
 ### Bonus A — CI/CD (if attempted)
 1. Why should the deploy step only run on `main` and not on feature branches?
    - I need to complete today
+   - i will AHHHH
 2. What would you add to this pipeline to prevent deploying a model that performs worse than the current version? Describe the gate.
    - TODO
 
