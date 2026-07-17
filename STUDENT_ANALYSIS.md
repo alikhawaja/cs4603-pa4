@@ -61,15 +61,15 @@ TODO: graph architecture, routing, deployment choices.
 
 ### Task 1.2 — Planner
 1. What happens when the planner produces steps that depend on each other (e.g., step 3 needs the result of step 1)? How does your architecture handle this?
-   - TODO
+   - It will be handled automatically becasue the steps execute sequentially. Step 3 can use result step 1 because the results are stored in `step_results` list.
 2. Would a replanning step after each execution improve or hurt performance for this use case? Justify with an example.
-   - TODO
+   - It will hurt the perofrmance because it adds the latency if we replan after each step. For our current work, planning once is enough.
 
 ### Task 1.3 — Supervisor
 1. Your supervisor makes a routing decision per step. What is the failure mode if it misroutes? How would you detect and recover from a misroute?
-   - TODO
+   - If the supervisor misroutes a step say it routes a calculation step to rag tool. It will fetch irrevlant details or return "Not found". This step will fail silently without crashing. We can detect this by having out tools tag their output type and letting supervisor re-classify the step if the results looks off topic
 2. Compare this supervisor pattern with a single ReAct agent that has access to all tools. When is the supervisor pattern worth the added complexity?
-   - TODO
+   - In a single ReAct pattern, the agent has access to all the tools and it can call the tools freely itself without relying on anyone, it is much simpler than supervisor pattern. In projects, where we have hetrogenous tasks that requires completely different tools from each other, supervisor is much more effective and delegate the tasks efficiently to the relevant tools.
 
 ### Task 1.4 — RAG Agent
 1. The RAG agent retrieves for a single decomposed step, not the full user query. How does this affect retrieval quality compared to retrieving for the original question?

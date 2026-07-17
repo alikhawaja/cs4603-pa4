@@ -18,7 +18,26 @@ from __future__ import annotations
 
 
 def build_chunks_table(spark, volume_path: str, chunks_table: str) -> None:
-    raise NotImplementedError("Task 0.3: parse + chunk into a Delta table")
+    spark.sql(f"DROP TABLE IF EXISTS {chunks_table}")
+
+    spark.sql(f"""
+    CREATE TABLE {chunks_table} AS
+    SELECT *
+    FROM ai_prep_search(
+        ai_parse_document(
+            "{volume_path}"
+        )
+    )
+    """)
+
+    spark.sql(f"""
+    ALTER TABLE {chunks_table}
+    SET TBLPROPERTIES (
+        delta.enableChangeDataFeed = true
+    )
+    """)
+
+    print(f"Created {chunks_table}")
 
 
 def create_index() -> None:
