@@ -24,9 +24,7 @@ def build_chunks_table(spark, volume_path: str, chunks_table: str) -> None:
     CREATE TABLE {chunks_table} AS
     SELECT *
     FROM ai_prep_search(
-        ai_parse_document(
-            "{volume_path}"
-        )
+        (SELECT ai_parse_document(content) FROM READ_FILES('{volume_path}', format => 'binaryFile'))
     )
     """)
 
