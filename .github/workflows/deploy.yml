@@ -1,11 +1,11 @@
 # Bonus A — CI/CD pipeline (.github/workflows/deploy.yml)
 #
-# TODO: Implement a lint -> test -> deploy workflow.
-#   - lint:   ruff check on agent/ and client/
-#   - test:   a smoke test that imports and compiles the graph
-#   - deploy: ONLY on push to main; log the model, register a new UC version,
-#             and update the serving endpoint. Use GitHub Secrets for
-#             DATABRICKS_HOST / DATABRICKS_TOKEN. Add a workflow_dispatch trigger.
+# lint -> test -> deploy.  Deploy runs ONLY on push to main (never on PRs / feature
+# branches). Credentials come from GitHub repo secrets DATABRICKS_HOST / DATABRICKS_TOKEN.
+#
+# NOTE: the runner is Linux + Python 3.12 (pinned by the repo's .python-version), which is
+# exactly the environment the Databricks serving container expects — so deploying from CI
+# avoids the Windows/Python-3.14 packaging issues you hit when logging from a laptop.
 
 name: deploy
 
@@ -13,19 +13,70 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch:
+  workflow_dispatch: # manual "Run workflow" button for ad-hoc deploys
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # TODO: install uv, sync deps, run `ruff check` and the smoke test
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies (incl. dev tools)
+        run: uv sync --extra dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check agent/ client/
+
+      - name: Smoke test (offline, mocked LLM)
+        run: uv run pytest tests/test_smoke.py -q
 
   deploy:
     needs: lint-and-test
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    env:
+      # Secrets — set in Repo → Settings → Secrets and variables → Actions.
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      # Non-secret config the deploy script + serving container need.
+      DATABRICKS_MODEL: databricks-meta-llama-3-3-70b-instruct
+      EMBEDDINGS_ENDPOINT: databricks-gte-large-en
+      UC_CATALOG: 27100082_pa4
+      UC_SCHEMA: default
+      UC_MODEL: document_analyst
+      VECTOR_SEARCH_ENDPOINT: 27100082-vs-endpoint
+      VECTOR_SEARCH_INDEX: 27100082_pa4.default.27100082_analyst_index
+      SOURCE_TABLE: 27100082_pa4.default.27100082_analyst_chunks
+      SERVING_ENDPOINT_NAME: 27100082-document-analyst
+      SECRET_SCOPE: cs4603-deploy
     steps:
       - uses: actions/checkout@v4
-      # TODO: install deps and run `python deployment/deploy.py` with secrets
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      # deploy.py logs the model, registers a UC version, creates/updates the endpoint,
+      # waits for READY, and prints the deployed version + endpoint URL/status.
+      - name: Log model, register UC version, update endpoint
+        run: uv run python deployment/deploy.py
+
+      - name: Report deployed version + endpoint status (via REST)
+        run: |
+          uv run python - <<'PY'
+          import os, json, urllib.request
+          host = os.environ["DATABRICKS_HOST"].rstrip("/")
+          name = os.environ["SERVING_ENDPOINT_NAME"]
+          req = urllib.request.Request(
+              f"{host}/api/2.0/serving-endpoints/{name}",
+              headers={"Authorization": f"Bearer {os.environ['DATABRICKS_TOKEN']}"})
+          d = json.loads(urllib.request.urlopen(req, timeout=30).read())
+          print("Endpoint:", d["name"], "| state:", d["state"])
+          for se in (d.get("config") or {}).get("served_entities", []):
+              print("Serving:", se["entity_name"], "version", se["entity_version"])
+          PY

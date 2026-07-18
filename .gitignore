@@ -9,8 +9,13 @@ dist/
 # Environments
 .env
 .venv/
+.venv312/
 venv/
 env/
+
+# Local MLflow stores (created during deploy debugging)
+mlruns/
+mlruns_*/
 
 # Databricks / notebooks
 .databricks/
