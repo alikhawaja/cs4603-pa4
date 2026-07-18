@@ -1,0 +1,5 @@
+# Bonus C — Databricks App config for the standalone MCP tool server.
+# The app is deployed from a staged source dir where app.py and tools/ sit
+# side by side (see deployment/mcp_app/deploy_app.py), so the command is
+# relative to that source root.
+command: ["python", "app.py"]

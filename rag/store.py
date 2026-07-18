@@ -1,9 +1,9 @@
-"""Vector Search retriever factory (Task 1.4 support / rag/store.py).
+"""Vector Search retriever factory (Task 1.4 support).
 
-TODO: Implement `get_retriever(k=4)` that returns a LangChain retriever over the
-Databricks Vector Search index built by `ingest.py`, using
-`DatabricksVectorSearch` from `databricks_langchain`. Read endpoint/index names
-from config.get_settings(). This exact retriever is reused by the deployed model.
+Returns a LangChain retriever over the managed Databricks Vector Search index
+built by `rag/ingest.py`. Because the index is a managed service reachable
+with DATABRICKS_HOST/DATABRICKS_TOKEN, this exact code path runs both locally
+and inside the deployed serving container — no separate embedding path.
 """
 
 from __future__ import annotations
@@ -15,8 +15,23 @@ CITATION_COLUMNS = ["chunk_id", "source", "page"]
 
 
 def get_vector_store():
-    raise NotImplementedError("Task 1.4: return a DatabricksVectorSearch handle")
+    from databricks_langchain import DatabricksVectorSearch
+
+    settings = get_settings()
+    if not settings["vs_endpoint"] or not settings["vs_index"]:
+        raise OSError(
+            "Missing required environment variables: VECTOR_SEARCH_ENDPOINT and/or "
+            "VECTOR_SEARCH_INDEX. The retriever cannot reach the Vector Search index "
+            "without them — set both in .env (local) or endpoint environment_vars (deployed)."
+        )
+    # Delta Sync index with managed embeddings: the service embeds the query
+    # server-side, so no embedding model is configured here.
+    return DatabricksVectorSearch(
+        endpoint=settings["vs_endpoint"],
+        index_name=settings["vs_index"],
+        columns=CITATION_COLUMNS,
+    )
 
 
 def get_retriever(k: int = 4):
-    raise NotImplementedError("Task 1.4: return a top-k retriever over the index")
+    return get_vector_store().as_retriever(search_kwargs={"k": k})

@@ -1,0 +1,2 @@
+# Installed by Databricks Apps at deploy time.
+mcp>=1.0.0

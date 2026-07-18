@@ -1,11 +1,13 @@
-# Bonus A — CI/CD pipeline (.github/workflows/deploy.yml)
+# Bonus A — CI/CD pipeline: lint -> test -> deploy.
 #
-# TODO: Implement a lint -> test -> deploy workflow.
-#   - lint:   ruff check on agent/ and client/
-#   - test:   a smoke test that imports and compiles the graph
-#   - deploy: ONLY on push to main; log the model, register a new UC version,
-#             and update the serving endpoint. Use GitHub Secrets for
-#             DATABRICKS_HOST / DATABRICKS_TOKEN. Add a workflow_dispatch trigger.
+# - push to main        -> lint + test, then deploy (log model, register UC
+#                          version, update the serving endpoint)
+# - pull_request        -> lint + test only (deploy is guarded off)
+# - workflow_dispatch   -> manual "Run workflow" button for ad-hoc deploys
+#
+# DATABRICKS_HOST / DATABRICKS_TOKEN come from GitHub repo secrets
+# (Settings -> Secrets and variables -> Actions). Non-secret configuration
+# (catalog, index names, endpoint name) is plain env below.
 
 name: deploy
 
@@ -15,17 +17,74 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  # Non-secret configuration shared by both jobs.
+  DATABRICKS_MODEL: databricks-meta-llama-3-3-70b-instruct
+  EMBEDDINGS_ENDPOINT: databricks-gte-large-en
+  UC_CATALOG: cs4603
+  UC_SCHEMA: default
+  VECTOR_SEARCH_ENDPOINT: cs4603_rag_endpoint
+  VECTOR_SEARCH_INDEX: cs4603.default.zakariya_analyst_index
+  SERVING_ENDPOINT_NAME: zakariya-document-analyst
+  SECRET_SCOPE: cs4603-deploy
+  # Bonus C: keep the endpoint pointed at the remote MCP app on redeploys
+  # (its client credentials stay in the cs4603-deploy secret scope).
+  MCP_SERVER_URL: https://cs4603-mcp-tools-7474646727822744.aws.databricksapps.com
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # TODO: install uv, sync deps, run `ruff check` and the smoke test
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check agent/ client/
+
+      - name: Offline smoke test (mocked LLM — no Databricks, no network)
+        run: uv run pytest -q tests/test_smoke.py
 
   deploy:
-    needs: lint-and-test
+    needs: lint-and-test                # deploy ONLY after lint+test pass
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      # TODO: install deps and run `python deployment/deploy.py` with secrets
+      - uses: actions/checkout@v4       # fresh machine: checkout + deps again
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Log model, register UC version, update serving endpoint
+        run: uv run python deployment/deploy.py
+
+      - name: Report deployed version and endpoint status
+        run: |
+          uv run python - <<'PY'
+          import os
+          from databricks.sdk import WorkspaceClient
+          from mlflow import MlflowClient
+          import mlflow
+
+          mlflow.set_tracking_uri("databricks")
+          mlflow.set_registry_uri("databricks-uc")
+          name = f"{os.environ['UC_CATALOG']}.{os.environ['UC_SCHEMA']}.zakariya_document_analyst"
+          latest = max(
+              MlflowClient().search_model_versions(f"name='{name}'"),
+              key=lambda v: int(v.version),
+          )
+          ep = WorkspaceClient().serving_endpoints.get(os.environ["SERVING_ENDPOINT_NAME"])
+          print(f"deployed model version: {name} v{latest.version}")
+          print(f"endpoint status: ready={ep.state.ready.value} "
+                f"config_update={ep.state.config_update.value}")
+          PY
