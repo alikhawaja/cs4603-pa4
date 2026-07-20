@@ -1037,3 +1037,4 @@ Most Part 2/3 time is lost to a handful of failure modes. Check here first.
 | Standalone MCP server on Databricks (Bonus C) | `wk4_agents_mcp/` (MCP transports) + Databricks Apps docs |
 | RAG ingestion & Vector Search retrieval | PA2 Part 1 (Databricks Vector Search) |
 
+
