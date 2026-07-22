@@ -7,6 +7,8 @@
 
 ---
 
+> **Read this first.** Before starting Part 1, read the tutorial [`../tutorials/uc-function-tools.md`](../tutorials/uc-function-tools.md). It walks through the **architecture and design** of working with Unity Catalog Functions as agent tools — what a UC Function is, how it differs from your `@tool` and MCP tools, how `UCFunctionToolkit` turns it into a tool, where execution happens, and how governance and automatic authorization fit together. It is a good, self-contained tutorial and the tasks below assume you have gone through it.
+
 Your PA4 agent calls math/finance tools through an MCP server (`tools/mcp_server.py`). Those tools are invisible to the platform. In this part you make them **first-class governed assets** in Unity Catalog.
 
 ### Task 1.1: Register Python functions in Unity Catalog
