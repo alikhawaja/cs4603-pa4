@@ -18,14 +18,51 @@ on:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-      # TODO: install uv, sync deps, run `ruff check` and the smoke test
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check agent/ client/
+
+      - name: Run offline smoke test
+        run: uv run python -m pytest tests/test_smoke.py -q
 
   deploy:
     needs: lint-and-test
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-      # TODO: install deps and run `python deployment/deploy.py` with secrets
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Deploy model
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          DATABRICKS_MODEL: ${{ secrets.DATABRICKS_MODEL }}
+          SERVING_ENDPOINT_NAME: ${{ secrets.SERVING_ENDPOINT_NAME }}
+          UC_CATALOG: ${{ secrets.UC_CATALOG }}
+          UC_SCHEMA: ${{ secrets.UC_SCHEMA }}
+          VECTOR_SEARCH_ENDPOINT: ${{ secrets.VECTOR_SEARCH_ENDPOINT }}
+          VECTOR_SEARCH_INDEX: ${{ secrets.VECTOR_SEARCH_INDEX }}
+          EMBEDDINGS_ENDPOINT: ${{ secrets.EMBEDDINGS_ENDPOINT }}
+        run: uv run python deployment/deploy.py

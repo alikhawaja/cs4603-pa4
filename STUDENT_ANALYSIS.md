@@ -61,47 +61,51 @@ TODO: graph architecture, routing, deployment choices.
 
 ### Task 1.2 — Planner
 1. What happens when the planner produces steps that depend on each other (e.g., step 3 needs the result of step 1)? How does your architecture handle this?
-   - TODO
+   - It will be handled automatically becasue the steps execute sequentially. Step 3 can use result step 1 because the results are stored in `step_results` list.
 2. Would a replanning step after each execution improve or hurt performance for this use case? Justify with an example.
-   - TODO
+   - It will hurt the perofrmance because it adds the latency if we replan after each step. For our current work, planning once is enough.
 
 ### Task 1.3 — Supervisor
 1. Your supervisor makes a routing decision per step. What is the failure mode if it misroutes? How would you detect and recover from a misroute?
-   - TODO
+   - If the supervisor misroutes a step say it routes a calculation step to rag tool. It will fetch irrevlant details or return "Not found". This step will fail silently without crashing. We can detect this by having out tools tag their output type and letting supervisor re-classify the step if the results looks off topic
 2. Compare this supervisor pattern with a single ReAct agent that has access to all tools. When is the supervisor pattern worth the added complexity?
-   - TODO
+   - In a single ReAct pattern, the agent has access to all the tools and it can call the tools freely itself without relying on anyone, it is much simpler than supervisor pattern. In projects, where we have hetrogenous tasks that requires completely different tools from each other, supervisor is much more effective and delegate the tasks efficiently to the relevant tools.
 
 ### Task 1.4 — RAG Agent
 1. The RAG agent retrieves for a single decomposed step, not the full user query. How does this affect retrieval quality compared to retrieving for the original question?
-   - TODO
+   - The decomposed step is more specific focused, leading to better retrieval quality, The original might be too broad.
 2. If the planner produces a vague step like "find relevant financial data," how would you improve the retrieval query before sending it to the vector store?
-   - TODO
+   - I would rewrite the step before retrieval using a small LLM call that takes both the vague step and the original user query as context.
 
 ### Task 2.1 — Model Definition
 1. Why does `models-from-code` require a self-contained file? What breaks if you reference external state (e.g., a database running only on your laptop)?
-   - TODO
+   - MLflow re-executes agent_model.py during logging and again in the serving container, so it must run successfully in any environment. References to local files, services, or environment-specific state can cause deployment or runtime failures.
+
 2. Your model calls a managed Vector Search index at inference time rather than embedding documents into the container image. What are the tradeoffs (freshness, cold-start size, latency, failure modes) of querying an external index vs. baking the corpus into the model artifact?
-   - TODO
+   - An external Vector Search index keeps data up to date and the model artifact small, but adds network latency and dependency on the index's availability. Baking the corpus into the model removes that dependency but increases artifact size and makes the data stale.
 
 ### Task 2.3 — Serving Endpoint
 1. Why must you pass `DATABRICKS_TOKEN` as an environment variable to the endpoint, even though it's already authenticated to serve models?
-   - TODO
+   - The serving endpoint's authentication only handles incoming requests; the model still needs its own credentials to call Databricks services like Vector Search and LLM endpoints. Without the environment variables, those API calls fail.
 2. What happens to in-flight requests when you deploy a new model version to the same endpoint? How does Databricks handle the transition?
-   - TODO
+   - Databricks performs a rolling update by bringing up the new model version before shifting traffic. Existing requests continue on the old version, while new requests are routed to the new version once it is healthy.
+
 
 ### Task 3.2 — Client
 1. Why is exponential backoff better than fixed-interval retries for a model serving endpoint?
-   - TODO
+   - Exponential backoff gradually increases the delay between retries, giving the endpoint time to recover or scale up. It also prevents many clients from retrying simultaneously and overloading the service further.
+
 2. Your client has a `max_retries` parameter. What is the danger of setting it too high in a production system with many concurrent users?
-   - TODO
+   - A high retry limit can create a retry storm, where many clients repeatedly hit an already failing endpoint. This increases load, delays recovery, and makes users wait longer before receiving an error.
+
 3. When would you choose `ask_streaming()` over `ask()`? Give a concrete UX example.
-   - TODO
+   - Use ask_streaming() for chat interfaces where users benefit from seeing responses appear progressively, improving perceived responsiveness. Use ask() for scripts or batch jobs that only need the final response.
 
 ### Bonus A — CI/CD (if attempted)
 1. Why should the deploy step only run on `main` and not on feature branches?
-   - TODO
+   - Deploying only from main ensures only reviewed and tested code reaches production. Feature branches may contain incomplete or experimental changes that should not update the serving endpoint.
 2. What would you add to this pipeline to prevent deploying a model that performs worse than the current version? Describe the gate.
-   - TODO
+   - Add an evaluation gate that runs the new model on a validation dataset and compares metrics against the current production model. Only deploy if the new model meets or exceeds predefined performance thresholds.
 
 ### Bonus B — `databricks-agents` SDK (if attempted)
 1. Compare the `agents.deploy()` approach with the manual MLflow + CLI approach from Part 2. What control do you gain or lose with each?

@@ -8,12 +8,32 @@ TODO: Implement `make_planner(llm)` returning a node that:
 """
 
 from __future__ import annotations
-
+from langchain_core.messages import SystemMessage, HumanMessage
 from agent.state import AnalystState
+from agent.prompts import PLANNER_PROMPT
 
+import json
 
 def make_planner(llm):
     def planner(state: AnalystState) -> dict:
-        raise NotImplementedError("Task 1.2: implement the planner node")
+        system_prompt = PLANNER_PROMPT
 
+        user_message = state["messages"][-1].content
+
+        response = llm.invoke([
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_message)
+        ])
+
+        try:
+            plan = json.loads(response.content)
+        except:
+            plan = [state['messages'][-1].content]
+        
+        return {
+            "plan": plan,
+            "current_step_index": 0,
+            "step_results": []
+        }
+    
     return planner
